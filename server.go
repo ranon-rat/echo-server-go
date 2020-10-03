@@ -2,11 +2,10 @@
 package main
 
 import (
-        "bufio"
-        "fmt"
+  	"log"
         "net"
-        "strings"
-
+	"fmt"   
+	
 )
 
 type user struct{
@@ -15,49 +14,42 @@ type user struct{
 func (u *user) newMessage(text string){
   u.message=append(u.message,string(text))
 }
-func main() {
-        mensaje:=user{}
+func (message *user) messageRequest(conn net.Conn) {
+	defer conn.Close()
+	defer log.Println("Closed connection.")
 
-        l, err := net.Listen("tcp", ":500")
-        if err != nil {
-                fmt.Println(err)
-                return
-        }
-        defer l.Close()
-
-        c, err := l.Accept()
-        if err != nil {
-        	c.Close()
-                fmt.Println(err)
-                return
-        }
-
-
-        for {
-                go readAndSend(mensaje,c)
-        }
+	for {
+		buf := make([]byte, 1024)
+		size, err := conn.Read(buf)
+		if err != nil {
+			return
+		}
+		data := buf[:size]
+		message.newMessage(string(data))
+		fmt.Print(message.message)
+		fmt.Println("asi es")
+		conn.Write(data)
+	}
 }
 
-func readAndSend(mensaje user,c net.Conn){
+func main() {
+	message:=user{}
 
-  for {
-          netData, err := bufio.NewReader(c).ReadString('\n')
-          if err != nil {
-                  fmt.Println(err)
-                  c.Close()
-                  return
-                  mensaje.newMessage(string(netData))
-          }
+	l, err := net.Listen("tcp",":500")
+	if err != nil {
+		log.Panicln(err)
+	}
+	defer l.Close()
+
+	for {
+		conn, err := l.Accept()
+		if err != nil {
+			log.Panicln(err)
+		}
+		fmt.Println(message.message)
+
+		go message.messageRequest(conn)
+	}
+}
 
 
-          if strings.TrimSpace(string(netData)) == "STOP" {
-                  fmt.Println("Exiting TCP server!")
-                  return
-          }
-
-          fmt.Print("-> ", string(netData))
-          c.Write([]byte(netData))
-          value:=strings.Join(mensaje.message,"")
-          c.Write([]byte(value))
-        }
-  }
